@@ -3,13 +3,13 @@ extern crate rustc_serialize;
 
 use std::env;
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read};
+use std::path::{Path};
 
 use handlebars::{Handlebars, Context};
 use rustc_serialize::json::Json;
 
 fn get_json_or_panic(file_name: &str) -> Json {
-
     let mut data = String::new();
 
     // Open the file.
@@ -31,6 +31,25 @@ fn get_json_or_panic(file_name: &str) -> Json {
     }
 }
 
+fn write_to_file_or_panic(path: String, context: &Context, handlebars: &Handlebars) {
+    let mut write = match File::create(&path) {
+        Ok(e) => e,
+        Err(_) => panic!("Cannot create output template!"),
+    };
+    
+    match handlebars.renderw("template", &context, &mut write) {
+        Ok(e) => e,
+        Err(_) => panic!("Cannot write to output template!"),
+    };
+}
+
+fn write_to_stdout_or_panic(context: &Context, handlebars: &Handlebars) {
+    match handlebars.renderw("template", &context, &mut io::stdout()) {
+        Ok(e) => e,
+        Err(_) => panic!("Cannot write to standard output ¯\\_(ツ)_/¯"),
+    };
+}
+
 
 fn main() {
 
@@ -39,39 +58,30 @@ fn main() {
     if !(args.len() > 2) {
         panic!("Usage: ./hb input_path.hbs context_path.json <output_path.html>");
     } 
-    
-    let input_path: String = args[1].clone();
+
+    let input_path_str = args[1].clone();
+    let input_path = Path::new(&input_path_str);
     let context_path: String = args[2].clone();
-    let output_path: String;
+    let mut output_path: String = String::new();
 
     if args.len() == 4 {
         output_path = args[3].clone();
-    } else {
-        // Replace input_path's extension with html and set to output_path.
-        let mut split: Vec<&str> = input_path.split(".").collect();
-        split.pop();
-        split.push("html");
-        output_path = split.join(".");
     }
 
-    let handlebars = Handlebars::new();
+    let mut handlebars = Handlebars::new();
 
     let json = get_json_or_panic(&context_path);
     let data = Context::wraps(&json);
 
-    let mut source_template = match File::open(&input_path) {
-        Ok(e) => e,
-        Err(_) => panic!("No template file!"),
-    };
-
-    let mut output_file = match File::create(&output_path) {
-        Ok(e) => e,
-        Err(_) => panic!("Cannot create output template!"),
-    };
-
-    if let Ok(_) = handlebars.template_renderw2(&mut source_template, &data, &mut output_file) {
-        println!("{} generated", output_path);
+    match handlebars.register_template_file("template", input_path) {
+        Ok(_) => {},
+        Err(_) => panic!("Cannot register template, bad syntax?")
+    }
+    
+    if output_path.len() > 0 {
+        write_to_file_or_panic(output_path, &data, &handlebars);
     } else {
-        panic!("Failed to geneate output.html. Bad hbs syntax?");
-    };
+        write_to_stdout_or_panic(&data, &handlebars);
+    }
+
 }
