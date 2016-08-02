@@ -1,0 +1,8 @@
+[package]
+name = "hb"
+version = "0.1.0"
+authors = ["rlopezcc <rlopezcc@outlook.com>"]
+
+[dependencies]
+handlebars = "0.18.2"
+rustc-serialize = "0.3"
